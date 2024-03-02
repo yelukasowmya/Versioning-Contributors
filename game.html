@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snake Game</title>
+<style>
+    .container {
+        background-image: url('snake.png'); /* Background image for the container */
+        background-size: cover;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        position: relative; /* Make the container position relative */
+    }
+    canvas {
+        border: 1px solid black;
+        position: absolute; /* Position the canvas over the background */
+        top: 50%; /* Center the canvas vertically */
+        left: 50%; /* Center the canvas horizontally */
+        transform: translate(-50%, -50%); /* Center the canvas precisely */
+        background-color: #FFC0CB; /* Light pink color for canvas */
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+</div>
+<div>Score: <span class="score">0</span></div>
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scale = 20; // size of each block
+    const rows = canvas.height / scale;
+    const columns = canvas.width / scale;
+    let snake;
+    let food;
+    let hurdles = []; // Array to store hurdles
+    let gameIsRunning = true;
+    let interval = 150; // initial interval time in milliseconds
+
+    (function setup() {
+        snake = new Snake();
+        food = new Food();
+        food.pickLocation();
+        generateHurdles();
+        
+        const gameLoop = setInterval(() => {
+            if (gameIsRunning) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                food.draw();
+                snake.update();
+                snake.draw();
+                drawHurdles();
+
+                if (snake.eat(food)) {
+                    food.pickLocation();
+                }
+
+                snake.checkCollision();
+                document.querySelector('.score').innerText = snake.total;
+
+                // Increase speed gradually
+                if (interval > 50) {
+                    interval -= 1;
+                    clearInterval(gameLoop);
+                    gameLoop = setInterval(updateGame, interval);
+                }
+            }
+        }, interval);
+
+        function updateGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            food.draw();
+            snake.update();
+            snake.draw();
+            drawHurdles();
+
+            if (snake.eat(food)) {
+                food.pickLocation();
+            }
+
+            snake.checkCollision();
+            document.querySelector('.score').innerText = snake.total;
+        }
+
+        window.addEventListener('keydown', (evt) => {
+            const direction = evt.key.replace('Arrow', '');
+            snake.changeDirection(direction);
+        });
+
+        window.addEventListener('beforeunload', (evt) => {
+            if (!gameIsRunning) {
+                evt.returnValue = ''; // Display confirmation message before closing the window
+            }
+        });
+    }());
+
+    function restartGame() {
+        gameIsRunning = true;
+        snake = new Snake();
+        food = new Food();
+        food.pickLocation();
+        generateHurdles();
+        interval = 150; // Reset interval time
+    }
+
+    function Snake() {
+        this.x = 0;
+        this.y = 0;
+        this.xSpeed = scale;
+        this.ySpeed = 0;
+        this.total = 0;
+        this.tail = [];
+
+        this.draw = function() {
+            ctx.fillStyle = '#808080'; // Gray color for snake
+            for (let i = 0; i < this.tail.length; i++) {
+                ctx.fillRect(this.tail[i].x, this.tail[i].y, scale, scale);
+            }
+            ctx.fillRect(this.x, this.y, scale, scale);
+        };
+
+        this.update = function() {
+            for (let i = 0; i < this.tail.length - 1; i++) {
+                this.tail[i] = this.tail[i + 1];
+            }
+            this.tail[this.total - 1] = { x: this.x, y: this.y };
+
+            this.x += this.xSpeed;
+            this.y += this.ySpeed;
+
+            if (this.x >= canvas.width || this.x < 0 || this.y >= canvas.height || this.y < 0) {
+                endGame();
+            }
+        };
+
+        this.changeDirection = function(direction) {
+            switch (direction) {
+                case 'Up':
+                    if (this.ySpeed === 0) {
+                        this.xSpeed = 0;
+                        this.ySpeed = -scale;
+                    }
+                    break;
+                case 'Down':
+                    if (this.ySpeed === 0) {
+                        this.xSpeed = 0;
+                        this.ySpeed = scale;
+                    }
+                    break;
+                case 'Left':
+                    if (this.xSpeed === 0) {
+                        this.xSpeed = -scale;
+                        this.ySpeed = 0;
+                    }
+                    break;
+                case 'Right':
+                    if (this.xSpeed === 0) {
+                        this.xSpeed = scale;
+                        this.ySpeed = 0;
+                    }
+                    break;
+            }
+        };
+
+        this.eat = function(food) {
+            if (this.x === food.x && this.y === food.y) {
+                this.total++;
+                return true;
+            }
+            return false;
+        };
+
+        this.checkCollision = function() {
+            for (let i = 0; i < this.tail.length; i++) {
+                if (this.x === this.tail[i].x && this.y === this.tail[i].y) {
+                    endGame();
+                }
+            }
+
+            // Check collision with hurdles
+            for (let i = 0; i < hurdles.length; i++) {
+                if (this.x === hurdles[i].x && this.y === hurdles[i].y) {
+                    endGame();
+                }
+            }
+        };
+    }
+
+    function Food() {
+        this.x;
+        this.y;
+
+        this.pickLocation = function() {
+            this.x = (Math.floor(Math.random() * columns)) * scale;
+            this.y = (Math.floor(Math.random() * rows)) * scale;
+        };
+
+        this.draw = function() {
+            ctx.fillStyle = '#ff0000'; // Red color for food
+            ctx.fillRect(this.x, this.y, scale, scale);
+        };
+    }
+
+    function Obstacle(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    function generateHurdles() {
+        hurdles = [];
+        for (let i = 0; i < 10; i++) { // Generate 10 hurdles
+            const x = Math.floor(Math.random() * columns) * scale;
+            const y = Math.floor(Math.random() * rows) * scale;
+            hurdles.push(new Obstacle(x, y));
+        }
+    }
+
+    function drawHurdles() {
+        ctx.fillStyle = '#000000'; // Black color for hurdles
+        for (let i = 0; i < hurdles.length; i++) {
+            ctx.fillRect(hurdles[i].x, hurdles[i].y, scale, scale);
+        }
+    }
+
+    function endGame() {
+        gameIsRunning = false;
+        const restart = window.confirm("Game Over! Do you want to start again?");
+        if (restart) {
+            restartGame();
+        }
+    }
+</script>
+</body>
+</html>
